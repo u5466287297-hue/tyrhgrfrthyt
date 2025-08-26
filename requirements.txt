@@ -1,5 +1,5 @@
 flask
-requests
 pandas
 ta
 plotly
+yfinance
