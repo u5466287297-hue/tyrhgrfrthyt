@@ -30,6 +30,12 @@ def get_forex_data(symbol="EURUSD=X"):
         df = yf.download(symbol, interval="1m", period="2d")
         df = df.reset_index()
         df.rename(columns={"Datetime":"time","Open":"open","High":"high","Low":"low","Close":"close"}, inplace=True)
+
+        # Уверяваме се, че всички колони са 1-D float
+        for col in ["open","high","low","close"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        df = df.dropna()
         return df
     except Exception as e:
         print("Error loading data:", e)
