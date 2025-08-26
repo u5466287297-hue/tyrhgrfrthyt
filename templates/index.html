@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Neon Trading Bot</title>
+  <meta http-equiv="refresh" content="60"> <!-- авто refresh на 1 минута -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: black;
+      color: #0ff;
+      font-family: 'Arial', sans-serif;
+    }
+    .neon {
+      text-shadow: 0 0 5px #0ff, 0 0 15px #0ff, 0 0 30px #0ff;
+    }
+    .signal {
+      font-size: 3rem;
+      margin-top: 1rem;
+    }
+    .buy { color: #00ff99; text-shadow: 0 0 15px #00ff99; }
+    .sell { color: #ff0066; text-shadow: 0 0 15px #ff0066; }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen">
+  <h1 class="neon text-4xl">🚀 Neon Trading Bot</h1>
+  <div class="signal {{ 'buy' if signal=='BUY' else 'sell' if signal=='SELL' else 'neon' }}">
+    Signal: {{ signal }}
+  </div>
+  <div class="mt-2 neon">RSI: {{ rsi }}</div>
+  <div class="w-4/5 mt-6">{{ chart|safe }}</div>
+  <p class="mt-6 text-gray-500">Auto-refresh every 1 min</p>
+</body>
+</html>
