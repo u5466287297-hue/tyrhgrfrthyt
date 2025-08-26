@@ -10,6 +10,8 @@ app = Flask(__name__)
 def get_data():
     url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=100"
     data = requests.get(url).json()
+    if not data or "code" in data:  # ако Binance върне грешка
+        return pd.DataFrame()
     df = pd.DataFrame(data, columns=["time","open","high","low","close","volume",
                                      "close_time","qav","trades","tbbav","tbqav","ignore"])
     df["time"] = pd.to_datetime(df["time"], unit="ms")
@@ -20,6 +22,8 @@ def get_data():
     return df
 
 def generate_signals(df):
+    if df.empty:
+        return df
     # Donchian Channel (30)
     df["donchian_high"] = df["high"].rolling(30).max()
     df["donchian_low"] = df["low"].rolling(30).min()
@@ -38,6 +42,8 @@ def generate_signals(df):
     return df
 
 def make_plot(df):
+    if df.empty:
+        return "<p style='color:red'>No data available</p>"
     fig = go.Figure(data=[go.Candlestick(x=df["time"],
                                          open=df["open"],
                                          high=df["high"],
@@ -67,9 +73,20 @@ def make_plot(df):
 @app.route("/")
 def home():
     df = get_data()
+    if df.empty:
+        return render_template("index.html", signal="HOLD", rsi="N/A", chart="<p>No data</p>")
+    
     df = generate_signals(df)
-    last_signal = df["signal"].iloc[-1] if df["signal"].iloc[-1] else "HOLD"
-    rsi = round(df["rsi"].iloc[-1],2)
+
+    if len(df) == 0 or "signal" not in df.columns:
+        last_signal = "HOLD"
+        rsi = "N/A"
+    else:
+        last_signal = df["signal"].iloc[-1]
+        if pd.isna(last_signal) or last_signal is None:
+            last_signal = "HOLD"
+        rsi = round(df["rsi"].iloc[-1], 2) if not pd.isna(df["rsi"].iloc[-1]) else "N/A"
+
     chart = make_plot(df)
     return render_template("index.html", signal=last_signal, rsi=rsi, chart=chart)
 
