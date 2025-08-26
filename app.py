@@ -1,25 +1,39 @@
-from flask import Flask, render_template
-import requests
+from flask import Flask, render_template, request
 import pandas as pd
 import ta
+import yfinance as yf
 import plotly.graph_objs as go
 import plotly.io as pio
 
 app = Flask(__name__)
 
-def get_data():
-    url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=100"
-    data = requests.get(url).json()
-    if not data or "code" in data:  # ако Binance върне грешка
+# Списък с най-популярните Forex двойки (Yahoo Finance символи)
+FOREX_PAIRS = {
+    "EUR/USD": "EURUSD=X",
+    "GBP/USD": "GBPUSD=X",
+    "USD/JPY": "JPY=X",
+    "AUD/USD": "AUDUSD=X",
+    "USD/CAD": "CAD=X",
+    "USD/CHF": "CHF=X",
+    "NZD/USD": "NZDUSD=X",
+    "EUR/GBP": "EURGBP=X",
+    "EUR/JPY": "EURJPY=X",
+    "GBP/JPY": "GBPJPY=X",
+    "EUR/CHF": "EURCHF=X",
+    "EUR/CAD": "EURCAD=X",
+    "AUD/JPY": "AUDJPY=X",
+    "NZD/JPY": "NZDJPY=X",
+}
+
+def get_forex_data(symbol="EURUSD=X"):
+    try:
+        df = yf.download(symbol, interval="1m", period="2d")
+        df = df.reset_index()
+        df.rename(columns={"Datetime":"time","Open":"open","High":"high","Low":"low","Close":"close"}, inplace=True)
+        return df
+    except Exception as e:
+        print("Error loading data:", e)
         return pd.DataFrame()
-    df = pd.DataFrame(data, columns=["time","open","high","low","close","volume",
-                                     "close_time","qav","trades","tbbav","tbqav","ignore"])
-    df["time"] = pd.to_datetime(df["time"], unit="ms")
-    df["open"] = df["open"].astype(float)
-    df["high"] = df["high"].astype(float)
-    df["low"] = df["low"].astype(float)
-    df["close"] = df["close"].astype(float)
-    return df
 
 def generate_signals(df):
     if df.empty:
@@ -50,13 +64,11 @@ def make_plot(df):
                                          low=df["low"],
                                          close=df["close"],
                                          name="Candles")])
-
     # BUY signals
     buys = df[df["signal"]=="BUY"]
     fig.add_trace(go.Scatter(x=buys["time"], y=buys["close"],
                              mode="markers", marker=dict(color="cyan", size=12, symbol="triangle-up"),
                              name="BUY"))
-
     # SELL signals
     sells = df[df["signal"]=="SELL"]
     fig.add_trace(go.Scatter(x=sells["time"], y=sells["close"],
@@ -72,23 +84,22 @@ def make_plot(df):
 
 @app.route("/")
 def home():
-    df = get_data()
-    if df.empty:
-        return render_template("index.html", signal="HOLD", rsi="N/A", chart="<p>No data</p>")
-    
+    # Взимаме избрания символ от GET параметър
+    symbol = request.args.get("symbol", "EURUSD=X")
+    df = get_forex_data(symbol)
     df = generate_signals(df)
 
-    if len(df) == 0 or "signal" not in df.columns:
+    if df.empty:
         last_signal = "HOLD"
         rsi = "N/A"
     else:
         last_signal = df["signal"].iloc[-1]
         if pd.isna(last_signal) or last_signal is None:
             last_signal = "HOLD"
-        rsi = round(df["rsi"].iloc[-1], 2) if not pd.isna(df["rsi"].iloc[-1]) else "N/A"
+        rsi = round(df["rsi"].iloc[-1],2) if not pd.isna(df["rsi"].iloc[-1]) else "N/A"
 
     chart = make_plot(df)
-    return render_template("index.html", signal=last_signal, rsi=rsi, chart=chart)
+    return render_template("index.html", signal=last_signal, rsi=rsi, chart=chart, symbol=symbol, pairs=FOREX_PAIRS)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
